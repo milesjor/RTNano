@@ -36,7 +36,7 @@ def get_argparse():
 
     parser.add_argument('-g', '--guppy_barcoder', type=str,
                         help='Optional: path/to/guppy_barcoder, when offering this parameter, it will do additional '
-                             'demultiplexing using guppy_barcoder --require_barcodes_both_ends')
+                             'demultiplexing using guppy_barcoder --require_barcodes_both_ends --trim_barcodes')
     parser.add_argument('--run_time', type=int, default='48',
                         help='total run time in hours [48]')
     parser.add_argument('--resume', action='store_true',
@@ -203,7 +203,7 @@ def individual_analysis(args, result_folder):
             cmd = """mkdir {save}/fastq
                      mv {save}/*.fastq {save}/fastq
                      {gp} --require_barcodes_both_ends -i {save}/fastq -s {save} --arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg" \
-                        -t {thread} >> {save}/result/{name}_alignment_summary.log
+                        -t {thread} --trim_barcodes >> {save}/result/{name}_alignment_summary.log
                      """.format(save=sample_path,
                                 gp=args.guppy_barcoder,
                                 name=one_sample,

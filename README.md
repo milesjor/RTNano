@@ -27,15 +27,15 @@ conda activate rtnano
 python -m pip install pandas
 ```
 
-## PARAMETERES
+## USAGE
 
 ### The parameters of RTNano
-Users can use the following command to print out parameters:
+Users can use the following command to print out usage:
 ```
 python ./rt_nano.py -h
 ```
 
-A list of available parameters:
+A list of full usage:
 ```
 usage: rt_nano.py [-h] -p PATH [-s SAVE_PATH] [-r REFER_SEQ] [-t THREAD]
                   [-T INTERVAL_TIME] [-R TARGET_REGION] [-g GUPPY_BARCODER]
@@ -63,7 +63,7 @@ optional arguments:
   -g GUPPY_BARCODER, --guppy_barcoder GUPPY_BARCODER
                         Optional: path/to/guppy_barcoder, when offering this
                         parameter, it will do additional demultiplexing using
-                        guppy_barcoder --require_barcodes_both_ends
+                        guppy_barcoder --require_barcodes_both_ends --trim_barcodes
   --run_time RUN_TIME   total run time in hours [48]
   --resume              resume the unexpectedly interrupted analysis. Please
                         use the same [-p] [-s] as before
@@ -110,18 +110,12 @@ python ./rt_nano.py -p ./example/ --call_variant
 ```
 ./example/rtnano_result/snv/
 └── 20200607_22.26.20
-    ├── barcode13
-    ├── barcode14
     ├── barcode15
     ├── barcode16
     ├── barcode17
     ├── barcode18
     ├── barcode19
     ├── barcode20
-    ├── barcode21
-    ├── barcode22
-    ├── barcode23
-    ├── barcode24
     └── unclassified
 ```
 
