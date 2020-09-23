@@ -1,1 +1,1 @@
-version = "RT_Nano v0.1"
+version = "RT_Nano v0.2"

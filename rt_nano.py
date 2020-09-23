@@ -9,7 +9,6 @@ import subprocess
 import glob
 import shutil
 import argparse
-import re
 import logging
 import multiprocessing
 import pandas as pd
@@ -17,6 +16,7 @@ from _version import version
 from datetime import datetime
 from timeit import default_timer as timer
 import call_variant
+import identity_analysis
 
 
 def get_argparse():
@@ -24,19 +24,16 @@ def get_argparse():
     parser.add_argument('-p', '--path', type=str, required=True, help='path/to/nanopore_result_folder')
     parser.add_argument('-s', '--save_path', type=str,
                         help='path/to/saved_folder Default: rtnano_result in -p PATH folder')
-    parser.add_argument('-r', '--refer_seq', type=str,
+    parser.add_argument('-r', '--refer_seq', type=validate_file,
                         help='path/to/reference_genome.fa, default is using SARS-CoV-2.fa in program folder')
     parser.add_argument('-t', '--thread', type=int, default='1', help='working thread [1]')
     parser.add_argument('-T', '--interval_time', type=int, default='1',
                         help='interval time for analysis in minutes [1]')
-    parser.add_argument('-R', '--target_region', type=str, default='11050-11244,14307-14500,23123-23431,28086-28752',
-                        help='primer targeted region (comma separated). Default: '
-                             '11050-11244,14307-14500,23123-23431,28086-28752')
-    # 11075-11221,14329-14477,23144-23411,28111-28731
-
-    parser.add_argument('-g', '--guppy_barcoder', type=str,
+    parser.add_argument('-g', '--guppy_barcoder', type=validate_file,
                         help='Optional: path/to/guppy_barcoder, when offering this parameter, it will do additional '
                              'demultiplexing using guppy_barcoder --require_barcodes_both_ends --trim_barcodes')
+    parser.add_argument('-k', '--barcode_kits', type=str,
+                        help='barcode kits used, e.g. "EXP-NBD114 EXP-NBD104" it is required when providing -g/--guppy_barcoder')
     parser.add_argument('--run_time', type=int, default='48',
                         help='total run time in hours [48]')
     parser.add_argument('--resume', action='store_true',
@@ -45,7 +42,8 @@ def get_argparse():
                         help='return fastq file to their original fastq_pass folder. Please use the same [-p] [-s] [-g]'
                              ' as you generated the result, together with --put_back')
     parser.add_argument('--call_variant', action='store_true',
-                        help='call variants using samtools and filter by alleic frequency (>=0.5). Please use the same [-p] [-s] '
+                        help='call variants using samtools and filter by alleic frequency (>=0.5). '
+                             'Please use the same [-p] [-s] '
                              'as you generated the result. It uses fastq file in analyzed_achieve/accumulated_reads '
                              'folder. If you want to use it for your own data, '
                              'please put fastq file in this folder, one sample one fastq file')
@@ -53,9 +51,39 @@ def get_argparse():
     parser.add_argument('-v', '--version', action='version', version=version, help='show the current version')
     args = parser.parse_args()
     if args.refer_seq is None:
-        args.refer_seq = sys.path[0] + '/SARS-CoV-2.fa'
-
+        args.refer_seq = sys.path[0] + '/amplicon.fa'
+    if args.guppy_barcoder is not None:
+        if args.barcode_kits is None:
+            sys.stderr.write("ERROR!  Please provide -k/--barcode_kits\n")
+            sys.exit(1)
+        else:
+            kit_list = barcode_kit_list()
+            for kit in str(args.barcode_kits).split(" "):
+                if kit not in kit_list:
+                    print_kit_list = "\n".join(kit_list)
+                    sys.stderr.write("ERROR!  -k/--barcode_kits is not in kit list:\n\n%s\n\n" % print_kit_list)
+                    sys.exit(1)
     return args
+
+
+def validate_file(x):
+    if not os.path.exists(x):
+        raise argparse.ArgumentTypeError("{0} does not exist".format(x))
+    return x
+
+
+def barcode_kit_list():
+    choices = ["EXP-NBD103", "EXP-NBD104", "EXP-NBD114", "EXP-NBD196", "EXP-PBC001", "EXP-PBC096",
+               "OND-SQK-LP0096M", "OND-SQK-LP0096S", "OND-SQK-LP1152S", "OND-SQK-LP9216",
+               "SQK-16S024", "SQK-LWB001", "SQK-PBK004", "SQK-PCB109", "SQK-RAB201", "SQK-RAB204",
+               "SQK-RBK001", "SQK-RBK004", "SQK-RBK096", "SQK-RLB001", "SQK-RPB004",
+               "VSK-VMK001", "VSK-VMK002"]
+    return choices
+
+
+def check_tool(tool):
+    """Check whether `tool` is on PATH and marked as executable."""
+    return shutil.which(tool) is not None
 
 
 def prepare_env(args):
@@ -69,7 +97,8 @@ def prepare_env(args):
     if os.path.isdir(result_folder):
         if args.resume is not True:
             sys.stderr.write("WARNING!  Result folder exist! <%s> \n"
-                             "WARNING!  To avoid overwriting in existing data, Please use a new path and restart the program.\n"
+                             "WARNING!  To avoid overwriting in existing data, "
+                             "Please use a new path and restart the program.\n"
                              "WARNING!  If you want to resume a unexpectedly interrupted analysis, "
                              "please use the same save_path [-s] as before, together with --resume \n" % result_folder)
             sys.exit(1)
@@ -93,14 +122,16 @@ def get_fastq_file(args, result_folder):
     if not os.path.isdir(analyzed):
         os.mkdir(analyzed)
         pooled_result = analyzed + '/pooled_result.txt'
-        with open(pooled_result, 'w') as outfile:
-            header = ["#barcode", "%_mapped_record", "%_mapped_base", "%_ontarget_base", "read_number", "total_base",
-                      "mapped_record", "unmapped_record", "mapped_base", "ontarget_base"]
+        with open(pooled_result, 'w') as outfile, open(args.refer_seq) as infile:
+            target_amplicon = []
 
-            target_region = args.target_region.split(',')
-            sum_header = header + target_region
+            for line in infile:
+                if line.startswith(">"):
+                    ref_name = line.strip(">").split()[0]
+                    target_amplicon.append(ref_name)
 
-            outfile.writelines('\t'.join(sum_header) + '\n')
+            header = ["#barcode", "read_number", "total_base"] + target_amplicon
+            outfile.writelines('\t'.join(header) + '\n')
 
     if not os.path.isdir(result_folder + '/analyzing/'):
         os.mkdir(result_folder + '/analyzing/')
@@ -139,45 +170,7 @@ def get_fastq_file(args, result_folder):
         return ['no_fastq_pass_folder', 0]
 
 
-def bash_analyze(sample_path, fq_path, one_sample, thread, refer_seq, accumulated_reads, target_region, summary,
-                 pooled_result):
-    awk = """awk 'BEGIN {sum=0} {sum+=$3} END {print "mapped_depth", sum}' """
-    awk2 = """awk 'NR%4==2{c++; l+=length($0)} END{print "read_number", c; print "base_number", l}'"""
-    awk3 = """awk '{print $2, $1}' """
-    awk4 = """awk '{if($2==0)print $1, "1"; else print}' """
-
-    cmd = """cat {fq_path}/*fastq > {save}/result/{name}.fastq
-             minimap2 -t {thread} -a -x map-ont -Y --MD {refer} {save}/result/{name}.fastq > {save}/result/{name}.sam \
-                                    2>> {save}/result/{name}_alignment_summary.log
-             samtools sort -@ {thread} {save}/result/{name}.sam -o {save}/result/{name}.bam >> {save}/result/{name}_alignment_summary.log 2>&1
-             samtools index -@ {thread} {save}/result/{name}.bam >> {save}/result/{name}_alignment_summary.log
-             samtools depth {save}/result/{name}.bam > {save}/result/{name}.coverage.txt
-             cat {save}/result/{name}.fastq | {awk2} >> {save}/result/{name}_alignment_summary.log
-             cat {save}/result/{name}.coverage.txt | {awk} >> {save}/result/{name}_alignment_summary.log
-             grep -v "^@" {save}/result/{name}.sam | cut -f 3 | sort | uniq -c | sort -n | {awk3} >> {save}/result/{name}_alignment_summary.log
-             cat {save}/result/{name}.fastq >> {accumulated_reads}/{name}.fastq
-             cat {save}/result/{name}_alignment_summary.log | tail -n 5 | {awk4} > {save}/result/{name}_alignment_summary.tail5.log
-             """.format(save=sample_path,
-                        fq_path=fq_path,
-                        name=one_sample,
-                        thread=thread,
-                        refer=refer_seq,
-                        accumulated_reads=accumulated_reads,
-                        awk=awk,
-                        awk2=awk2,
-                        awk3=awk3, awk4=awk4)
-    a = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    if a.stdout != b'':
-        logging.info(a.stdout.decode('utf-8'))
-
-    log_file = sample_path + '/result/' + one_sample + '_alignment_summary.tail5.log'
-    coverage_file = sample_path + '/result/' + one_sample + '.coverage.txt'
-    # count on target base
-    on_target_base(coverage_file, target_region, log_file)
-    print_result(one_sample, log_file, summary, pooled_result, target_region)
-
-
-def individual_analysis(args, result_folder):
+def individual_analysis(args, result_folder, target_amplicon):
     main_analyzing = result_folder + '/analyzing/'
     analyzed = result_folder + '/analyzed_achieve'
     accumulated_reads = result_folder + '/analyzed_achieve/accumulated_reads'
@@ -200,26 +193,35 @@ def individual_analysis(args, result_folder):
         os.mkdir(sample_path + '/result')
 
         if args.guppy_barcoder is not None:
+
+            # cmd = """mkdir {save}/fastq
+            #                      mv {save}/*.fastq {save}/fastq
+            #                      {gp} --require_barcodes_both_ends -i {save}/fastq -s {save} \
+            #                         --arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg" \
+            #                         -t {thread} --trim_barcodes >> {save}/result/{name}_alignment_summary.log
+
             cmd = """mkdir {save}/fastq
                      mv {save}/*.fastq {save}/fastq
-                     {gp} --require_barcodes_both_ends -i {save}/fastq -s {save} --arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg" \
+                     {gp} --require_barcodes_both_ends -i {save}/fastq -s {save} \
+                        --barcode_kits {barcode_kits} \
                         -t {thread} --trim_barcodes >> {save}/result/{name}_alignment_summary.log
                      """.format(save=sample_path,
                                 gp=args.guppy_barcoder,
                                 name=one_sample,
-                                thread=args.thread)
+                                thread=args.thread,
+                                barcode_kits=args.barcode_kits)
             subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE)
 
             gp_fastq_dir = sample_path + '/' + one_sample
             if os.path.isdir(gp_fastq_dir):
                 fq_path = gp_fastq_dir
-                bash_analyze(sample_path, fq_path, one_sample, args.thread, args.refer_seq, accumulated_reads,
-                             args.target_region, summary, pooled_result)
+                identity_analysis.get_identity(sample_path, fq_path, one_sample, args.thread, args.refer_seq,
+                                               accumulated_reads, target_amplicon, summary, pooled_result)
 
         else:
             fq_path = sample_path
-            bash_analyze(sample_path, fq_path, one_sample, args.thread, args.refer_seq, accumulated_reads,
-                         args.target_region, summary, pooled_result)
+            identity_analysis.get_identity(sample_path, fq_path, one_sample, args.thread, args.refer_seq,
+                                           accumulated_reads, target_amplicon, summary, pooled_result)
 
     old_result = result_folder + '/*_result.txt'
     old_result = glob.glob(old_result)
@@ -230,77 +232,99 @@ def individual_analysis(args, result_folder):
     cmd = """mv {analyzing} {analyzed}""".format(analyzed=analyzed, analyzing=analyzing)
     subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE)
 
-    result_pool(pooled_result, updated_result, args.target_region)
+    result_pool(pooled_result, updated_result, target_amplicon)
 
 
-def on_target_base(depth_file, target_region, log_file):
-    # depth_file = './barcode13.coverage.txt'
-    # target_region = '11049-11236,14306-14500,23124-23431,28086-28753'
-    # log_file = './barcode13_alignment_summary.tail5.log'
+def result_pool(pooled_result, updated_result, target_amplicon):
+    column_names = ["#barcode", "read_number", "total_base"] + target_amplicon
 
-    target_region = target_region.split(',')
+    df = pd.read_table(pooled_result)
+    new_df = pd.DataFrame(columns=column_names)
 
-    if len(target_region) == 0:
-        logging.error("ERROR!  No --target_region provided\n"
-                      "ERROR!  Please provide --target_region like: '11049-11236,14306-14500' \n")
-        sys.exit(1)
+    barcode_list = df['#barcode'].unique()
 
-    with open(depth_file, 'r') as infile, open(log_file, 'a') as outfile:
-        depth_dir = {}
+    for bc in barcode_list:
+        bc_df = df[df['#barcode'].str.match(bc)]
+        bc_df_sum = bc_df.sum(axis=0)
+
+        for amplicon in target_amplicon:
+            part_df = bc_df[amplicon]
+            part_df = part_df.str.split('/', expand=True).astype(float)
+
+            part_df[0] = part_df[0] * part_df[2]
+            part_df[1] = part_df[1] * part_df[2]
+            part_df_sum = part_df.sum(axis=0)
+
+            if part_df_sum[2] == 0:
+                bc_df_sum[amplicon] = 'N/A'
+            else:
+                part_df_sum[0] = round(part_df_sum[0] / part_df_sum[2] * 100, 1)
+                part_df_sum[1] = round(part_df_sum[1] / part_df_sum[2] * 100, 1)
+
+                bc_df_sum[amplicon] = part_df_sum[0].astype(str) + '/' + part_df_sum[1].astype(str) + '/' + \
+                                      part_df_sum[2].astype(int).astype(str)
+
+        if bc == 'unclassified':
+            bc = 'unclassified99'
+
+        bc_df_sum['#barcode'] = bc
+        new_df.loc[-1] = bc_df_sum
+        new_df.index = new_df.index + 1
+        new_df = new_df.sort_index()
+
+    new_df['sort'] = new_df['#barcode'].str.extract('(\d+)', expand=False).astype(int)
+    new_df.sort_values('sort', inplace=True)
+    new_df = new_df.drop('sort', axis=1)
+
+    new_df.to_csv(updated_result, header=True, index=None, sep='\t', mode='w')
+    with open(updated_result, 'r') as infile:
         for line in infile:
-            n, p, c = line.strip().split()
-            depth_dir[p.strip()] = c.strip()
-
-        for region in target_region:
-            region_split = re.split(r'_|-', region)
-            region_l = int(region_split[0])
-            region_r = int(region_split[1])
-
-            region_base = 0
-
-            for key in range(region_l, region_r+1):
-                if str(key) in depth_dir:
-                    region_base += int(depth_dir[str(key)])
-
-            # if region_base == 0:
-            #     region_base = 1
-            outfile.writelines(str(region) + ' ' + str(region_base) + '\n')
+            logging.info(line.strip())
 
 
-def print_result(name, log_file, summary, pooled_result, target_region):
-    target_region = target_region.split(',')
-    with open(log_file, 'r') as infile, open(summary, 'a') as outfile, open(pooled_result, 'a') as outfile2:
-        result_dir = {}
-        for line in infile:
-            key, value = line.strip().split()
-            result_dir[key.strip()] = value.strip()
+def cycle_run(args, result_folder, cycle_time, target_amplicon):
+    for cycle in range(cycle_time):
+        result = get_fastq_file(args, result_folder)
 
-        barcode = name
-        read_number = result_dir['read_number']
-        base_number = result_dir['base_number']
-        mapped_depth = result_dir['mapped_depth']
-        mapped_record = result_dir['SARS-CoV-2']  # extract name from reference sequence
-        unmapped_record = result_dir['*']
+        if result[0] == 'no_fastq_pass_folder':
+            logging.info("%s    WARNING!    No fastq_pass folder in input folder, will check again in %s min" %
+                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
+            time.sleep(args.interval_time * 60)
 
-        ontarget_base = 0
-        region_list = []
-        for region in target_region:
-            ontarget_base += int(result_dir[str(region)])
-            region_list = region_list + [str(result_dir[str(region)])]
+        elif result[0] == 'no_subfolder_in_fastq_pass':
+            logging.info("%s    No demultiplexed barcode folder in fastq_pass folder, will check again in %s min" %
+                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
+            time.sleep(args.interval_time * 60)
 
-        total_record_number = int(mapped_record) + int(unmapped_record)
-        percentage_of_mapped_record = round(int(mapped_record) / int(total_record_number), 4)
-        percentage_of_mapped_base = round(int(mapped_depth) / int(base_number), 4)
-        percentage_of_ontarget_base = round(int(ontarget_base) / int(mapped_depth), 4)
+        elif result[0] == 'no_new_fastq_file':
+            logging.info("%s    No new fastq file in fastq_pass folder, will check again in %s min" %
+                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
+            time.sleep(args.interval_time * 60)
 
-        result = [barcode, str(percentage_of_mapped_record), str(percentage_of_mapped_base),
-                  str(percentage_of_ontarget_base), str(read_number), str(base_number), str(mapped_record),
-                  str(unmapped_record), str(mapped_depth), str(ontarget_base)]
+        elif result[0] == 'find_new_fastq':
+            logging.info("%s    -->Start analyzing %s new fastq file ...\n" %
+                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(result[1])))
+            start = timer()
 
-        result = result + region_list
+            individual_analysis(args, result_folder, target_amplicon)
 
-        outfile.writelines('\t'.join(result) + '\n')
-        outfile2.writelines('\t'.join(result) + '\n')
+            end = timer()
+            used_time = round(end - start)
+            used_time_min = round(used_time / 60)
+
+            if int(args.interval_time) > int(used_time_min):
+                left_time = int(args.interval_time) - int(used_time_min)
+                logging.info("\n%s    <--Analysis finished in %s s, next run in %s min" %
+                             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(used_time), str(left_time)))
+                time.sleep(left_time * 60)
+            else:
+                logging.info("\n%s    <--Analysis finished in %s s, next run start now" %
+                             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(used_time)))
+
+        else:
+            logging.error("ERROR!  get_fastq_file return unrecognised value: %s\n"
+                          "ERROR!  check get_fastq_file(args, result_folder)\n" % result)
+            sys.exit(1)
 
 
 def put_back(args):
@@ -336,8 +360,8 @@ def put_back(args):
                         for file in fastq_list:
                             fastq_count += 1
                             shutil.move(file, mv_dir)
-        print("%s    Finished! total %s fastq file are returned to <%s>\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                                                              str(fastq_count), fastq_path))
+        print("%s    Finished! total %s fastq file are returned to <%s>\n" %
+              (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(fastq_count), fastq_path))
 
     else:
         sys.stderr.write("ERROR!  analyzed_folder not exist <%s>\n"
@@ -346,99 +370,23 @@ def put_back(args):
         sys.exit(1)
 
 
-def result_pool(pooled_result, updated_result, target_region):
-    target_region = target_region.split(',')
-    df = pd.read_table(pooled_result)
-    column_names = ["#barcode", "%_mapped_record", "%_mapped_base", "%_ontarget_base", "read_number", "total_base",
-                    "mapped_record", "unmapped_record", "mapped_base", "ontarget_base"]
-
-    column_names = column_names + target_region
-    new_df = pd.DataFrame(columns=column_names)
-
-    barcode_list = df['#barcode'].unique()
-
-    for bc in barcode_list:
-        bc_df = df[df['#barcode'].str.match(bc)]
-        bc_df_sum = bc_df.sum(axis=0)
-
-        if bc == 'unclassified':
-            bc = 'unclassified99'
-
-        bc_df_sum['#barcode'] = bc
-        new_df.loc[-1] = bc_df_sum
-        new_df.index = new_df.index + 1
-        new_df = new_df.sort_index()
-
-    change_dtype_lst = column_names[4:]
-    for column in change_dtype_lst:
-        new_df[column] = new_df[column].astype(str).astype(int)
-
-    new_df['%_mapped_record'] = (new_df['mapped_record'] / (new_df['mapped_record'] + new_df['unmapped_record'])).round(4)
-    new_df['%_mapped_base'] = (new_df['mapped_base'] / new_df['total_base']).round(4)
-    new_df['%_ontarget_base'] = (new_df['ontarget_base'] / new_df['mapped_base']).round(4)
-    new_df['sort'] = new_df['#barcode'].str.extract('(\d+)', expand=False).astype(int)
-    new_df.sort_values('sort', inplace=True)
-    new_df = new_df.drop('sort', axis=1)
-
-    new_df.to_csv(updated_result, header=True, index=None, sep='\t', mode='w')
-    with open(updated_result, 'r') as infile:
-        for line in infile:
-            logging.info(line.strip())
-
-
-def cycle_run(args, result_folder, cycle_time):
-    for cycle in range(cycle_time):
-        result = get_fastq_file(args, result_folder)
-
-        if result[0] == 'no_fastq_pass_folder':
-            logging.info("%s    WARNING!    No fastq_pass folder in input folder, will check again in %s min" %
-                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
-            time.sleep(args.interval_time * 60)
-
-        elif result[0] == 'no_subfolder_in_fastq_pass':
-            logging.info("%s    No demultiplexed barcode folder in fastq_pass folder, will check again in %s min" %
-                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
-            time.sleep(args.interval_time * 60)
-
-        elif result[0] == 'no_new_fastq_file':
-            logging.info("%s    No new fastq file in fastq_pass folder, will check again in %s min" %
-                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.interval_time))
-            time.sleep(args.interval_time * 60)
-
-        elif result[0] == 'find_new_fastq':
-            logging.info("%s    -->Start analyzing %s new fastq file ...\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                                                               str(result[1])))
-            start = timer()
-
-            individual_analysis(args, result_folder)
-
-            end = timer()
-            used_time = round(end - start)
-            used_time_min = round(used_time / 60)
-
-            if int(args.interval_time) > int(used_time_min):
-                left_time = int(args.interval_time) - int(used_time_min)
-                logging.info("\n%s    <--Analysis finished in %s s, next run in %s min" %
-                             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(used_time), str(left_time)))
-                time.sleep(left_time * 60)
-            else:
-                logging.info("\n%s    <--Analysis finished in %s s, next run start now" %
-                             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(used_time)))
-
-        else:
-            logging.error("ERROR!  get_fastq_file return unrecognised value: %s\n"
-                          "ERROR!  check get_fastq_file(args, result_folder)\n" % result)
-            sys.exit(1)
-
-
 def main():
     args = get_argparse()
+    if check_tool("minimap2") is not True:
+        sys.exit("ERROR! Executable minimap2 is not found!\n"
+                 "ERROR! Please install minimap2 -> `conda install minimap2=2.11`")
 
     if args.put_back is True:
         print("\n%s    Program start ..." % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         put_back(args)
 
     elif args.call_variant is True:
+        if check_tool("samtools") is not True:
+            sys.exit("ERROR! Executable samtools is not found!\n"
+                     "ERROR! Please install samtools -> `conda install samtools=1.9`")
+        if check_tool("bcftools") is not True:
+            sys.exit("ERROR! Executable bcftools is not found!\n"
+                     "ERROR! Please install bcftools -> `conda install bcftools=1.9`")
         print("\n%s    Program start ..." % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         print("--> Read fastq file from %s/analyzed_achieve/accumulated_reads/*.fastq" % args.save_path)
 
@@ -469,11 +417,20 @@ def main():
             print("%s    Variant calling finished!\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
         else:
-            sys.stderr.write("ERROR! No fastq file detected in %s/analyzed_achieve/accumulated_reads/\n" % args.save_path)
+            sys.stderr.write("ERROR! No fastq file detected in %s/analyzed_achieve/accumulated_reads/\n" %
+                             args.save_path)
             sys.exit(0)
 
     else:
         result_folder = prepare_env(args)
+
+        with open(args.refer_seq) as infile:
+            target_amplicon = []
+
+            for line in infile:
+                if line.startswith(">"):
+                    ref_name = line.strip(">").split()[0]
+                    target_amplicon.append(ref_name)
 
         ctime = datetime.now().strftime("%Y%m%d_%H.%M.%S")
         log_file = result_folder + '/' + ctime + '_rt_nano.log'
@@ -483,14 +440,14 @@ def main():
                             filemode='w')
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
         logging.info("\n%s    Program start ..." % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        logging.info("--> Working thread: %s" % args.thread)
+        logging.info("--> Working thread:  %s" % args.thread)
         logging.info("--> Reference genome: %s" % args.refer_seq)
-        logging.info("--> Target regions: %s" % args.target_region)
-        logging.info("--> Result saved in %s" % result_folder)
-        logging.info("--> Log saved in    %s" % log_file)
+        logging.info("--> Target amplicon: %s" % target_amplicon)
+        logging.info("--> Result saved in  %s" % result_folder)
+        logging.info("--> Log saved in     %s" % log_file)
 
         cycle_time = round(args.run_time * 60 / args.interval_time)
-        cycle_run(args, result_folder, cycle_time)
+        cycle_run(args, result_folder, cycle_time, target_amplicon)
         logging.info("\n%s    Run finished! Result and log saved in %s" %
                      (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), result_folder))
 
