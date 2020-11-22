@@ -3,18 +3,27 @@ import subprocess
 
 
 def get_identity(sample_path, fq_path, one_sample, thread, refer_seq, accumulated_reads, target_amplicon, summary,
-                 pooled_result):
+                 pooled_result, alignment_identity, covered_region):
     awk = """awk '{if($6 == "'${ref}'")print}' | \
-            awk 'BEGIN{a=0;b=0;c=0}{a+=$10/$11;b++;c+=($9-$8+1)/$7}END{print "'$ref'", a/b"/"c/b"/"b}' """
+             awk 'BEGIN{a=0;b=0;c=0}{a+=$10/$11;b++;c+=($9-$8+1)/$7}END{print "'$ref'", a/b"/"c/b"/"b}' """
+
     awk2 = """awk 'NR%4==2{c++; l+=length($0)} END{print "read_number", c; print "base_number", l}'"""
+
+    awk_filter = """awk '{if($6 == "'${ref}'")print}' | \
+                    awk 'BEGIN{a=0;b=0;c=0;d=0;e=0}{a=$10/$11;b=($9-$8+1)/$7; \
+                    if(a>="'${ident}'" && b>="'${cover}'"){d+=a;e+=b;c++}} \
+                    END{if(c>=1) print "'$ref'", d/c"/"e/c"/"c}' """
 
     cmd = """cat {fq_path}/*fastq > {save}/result/{name}.fastq
              minimap2 -x map-ont -c -t {thread} {refer} {save}/result/{name}.fastq 1> {save}/result/{name}.paf \
                                     2>> {save}/result/{name}_alignment_summary.log
              refNames=$(cat {save}/result/{name}.paf | cut -f6 | sort | uniq)
+             ident={ident}
+             cover={cover}
              
              for ref in $refNames ; do
-             cat {save}/result/{name}.paf | {awk} >> {save}/result/{name}_alignment_summary.result.log
+             # cat {save}/result/{name}.paf | {awk} >> {save}/result/{name}_alignment_summary.result.log
+             cat {save}/result/{name}.paf | {awk_filter} >> {save}/result/{name}_alignment_summary.result.log
              done
              
              cat {save}/result/{name}.fastq | {awk2} >> {save}/result/{name}_alignment_summary.result.log
@@ -26,7 +35,10 @@ def get_identity(sample_path, fq_path, one_sample, thread, refer_seq, accumulate
                         refer=refer_seq,
                         accumulated_reads=accumulated_reads,
                         awk=awk,
-                        awk2=awk2)
+                        awk2=awk2,
+                        awk_filter=awk_filter,
+                        ident=alignment_identity,
+                        cover=covered_region)
 
     a = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if a.stdout != b'':

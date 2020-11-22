@@ -17,6 +17,7 @@ from datetime import datetime
 from timeit import default_timer as timer
 import call_variant
 import identity_analysis
+import summarize_result
 
 
 def get_argparse():
@@ -28,7 +29,7 @@ def get_argparse():
                         help='path/to/reference_genome.fa, default is using SARS-CoV-2.fa in program folder')
     parser.add_argument('-t', '--thread', type=int, default='1', help='working thread [1]')
     parser.add_argument('-T', '--interval_time', type=int, default='1',
-                        help='interval time for analysis in minutes [1]')
+                        help='interval time for scanning minknow folder in minutes [1]')
     parser.add_argument('-g', '--guppy_barcoder', type=validate_file,
                         help='Optional: path/to/guppy_barcoder, when offering this parameter, it will do additional '
                              'demultiplexing using guppy_barcoder --require_barcodes_both_ends --trim_barcodes')
@@ -36,6 +37,14 @@ def get_argparse():
                         help='barcode kits used, e.g. "EXP-NBD114 EXP-NBD104" it is required when providing -g/--guppy_barcoder')
     parser.add_argument('--run_time', type=int, default='48',
                         help='total run time in hours [48]')
+    parser.add_argument('--align_identity', type=float, default='0.89',
+                        help='minimum [0.89] alignment identity when considering an effective alignment')
+    parser.add_argument('--covered_pcent', type=float, default='0.96',
+                        help='minimum covering [0.96] of amplicon length when considering an effective alignment')
+    parser.add_argument('--housekeep_gene', type=str, default='ACTB_263bp',
+                        help='the amplicon name of housekeeping gene in the sequencing, default: [ACTB_263bp]')
+    parser.add_argument('--ntc', type=str,
+                        help='barcode number of no template control in the sequencing, e.g. barcode96')
     parser.add_argument('--resume', action='store_true',
                         help='resume the unexpectedly interrupted analysis. Please use the same [-p] [-s] as before')
     parser.add_argument('--put_back', action='store_true',
@@ -203,7 +212,7 @@ def individual_analysis(args, result_folder, target_amplicon):
             cmd = """mkdir {save}/fastq
                      mv {save}/*.fastq {save}/fastq
                      {gp} --require_barcodes_both_ends -i {save}/fastq -s {save} \
-                        --barcode_kits {barcode_kits} \
+                        --barcode_kits "{barcode_kits}" \
                         -t {thread} --trim_barcodes >> {save}/result/{name}_alignment_summary.log
                      """.format(save=sample_path,
                                 gp=args.guppy_barcoder,
@@ -216,12 +225,14 @@ def individual_analysis(args, result_folder, target_amplicon):
             if os.path.isdir(gp_fastq_dir):
                 fq_path = gp_fastq_dir
                 identity_analysis.get_identity(sample_path, fq_path, one_sample, args.thread, args.refer_seq,
-                                               accumulated_reads, target_amplicon, summary, pooled_result)
+                                               accumulated_reads, target_amplicon, summary, pooled_result,
+                                               args.align_identity, args.covered_pcent)
 
         else:
             fq_path = sample_path
             identity_analysis.get_identity(sample_path, fq_path, one_sample, args.thread, args.refer_seq,
-                                           accumulated_reads, target_amplicon, summary, pooled_result)
+                                           accumulated_reads, target_amplicon, summary, pooled_result,
+                                           args.align_identity, args.covered_pcent)
 
     old_result = result_folder + '/*_result.txt'
     old_result = glob.glob(old_result)
@@ -232,10 +243,10 @@ def individual_analysis(args, result_folder, target_amplicon):
     cmd = """mv {analyzing} {analyzed}""".format(analyzed=analyzed, analyzing=analyzing)
     subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE)
 
-    result_pool(pooled_result, updated_result, target_amplicon)
+    result_pool(pooled_result, updated_result, target_amplicon, args.housekeep_gene, args.ntc)
 
 
-def result_pool(pooled_result, updated_result, target_amplicon):
+def result_pool(pooled_result, updated_result, target_amplicon, housekeeping, NTC):
     column_names = ["#barcode", "read_number", "total_base"] + target_amplicon
 
     df = pd.read_table(pooled_result)
@@ -280,6 +291,11 @@ def result_pool(pooled_result, updated_result, target_amplicon):
     with open(updated_result, 'r') as infile:
         for line in infile:
             logging.info(line.strip())
+
+    # add result label
+
+    logging.info("\n- Clean result -\n")
+    summarize_result.summarize(updated_result, target_amplicon, housekeeping, NTC)
 
 
 def cycle_run(args, result_folder, cycle_time, target_amplicon):
@@ -342,6 +358,7 @@ def put_back(args):
     fastq_path = args.path + '/fastq_pass/'
 
     analyzed_folder = result_folder + '/analyzed_achieve/'
+    analyzing_folder = result_folder + '/analyzing/'
 
     if os.path.isdir(analyzed_folder):
         fastq_count = 0
@@ -360,6 +377,31 @@ def put_back(args):
                         for file in fastq_list:
                             fastq_count += 1
                             shutil.move(file, mv_dir)
+
+        if os.path.isdir(analyzing_folder):
+            folder_list = [name for name in os.listdir(analyzing_folder) if os.path.isdir(analyzing_folder + name)]
+            if len(folder_list) >= 1:
+                for time_folder in folder_list:
+                    if time_folder.startswith("20"):
+                        time_folder_dir = analyzing_folder + time_folder + '/'
+                        sub_folder_list = [name for name in os.listdir(time_folder_dir) if
+                                           os.path.isdir(time_folder_dir + name)]
+                        for barcode_folder in sub_folder_list:
+                            barcode_folder_dir = time_folder_dir + barcode_folder
+
+                            if os.path.isdir(barcode_folder_dir + '/fastq'):
+                                fastq_in = '/fastq/'
+                            else:
+                                fastq_in = '/'
+
+                            fastq_dir = barcode_folder_dir + fastq_in
+                            fastq_list = glob.glob(str(fastq_dir + '*.fastq'))
+                            if len(fastq_list) >= 1:
+                                mv_dir = fastq_path + barcode_folder + '/'
+                                for file in fastq_list:
+                                    fastq_count += 1
+                                    shutil.move(file, mv_dir)
+
         print("%s    Finished! total %s fastq file are returned to <%s>\n" %
               (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(fastq_count), fastq_path))
 
@@ -443,8 +485,13 @@ def main():
         logging.info("--> Working thread:  %s" % args.thread)
         logging.info("--> Reference genome: %s" % args.refer_seq)
         logging.info("--> Target amplicon: %s" % target_amplicon)
-        logging.info("--> Result saved in  %s" % result_folder)
-        logging.info("--> Log saved in     %s" % log_file)
+        logging.info("--> Result saved in:  %s" % result_folder)
+        logging.info("--> Log saved in:     %s" % log_file)
+        logging.info("--> housekeep gene:   %s" % args.housekeep_gene)
+        logging.info("--> No template control:        %s" % args.ntc)
+        logging.info("--> Covered region filter:      %s" % args.covered_pcent)
+        logging.info("--> Alignment identity filter:  %s" % args.align_identity)
+        logging.info("--> Positive sample confidence level: POS_3 > POS_2 > POS_1 > POS_0")
 
         cycle_time = round(args.run_time * 60 / args.interval_time)
         cycle_run(args, result_folder, cycle_time, target_amplicon)
