@@ -1,7 +1,7 @@
 # RTNano
- Real-Time Nanopore sequencing monitor (RTNano)
+Real-Time Nanopore sequencing monitor (RTNano)
 
-RTNano is a tool for real-time analysis of Nanopore sequencing data to detect pathogen-positive samples and call variants. The analysis is ultra-fast, without consuming too much PC resourse. It is a part of NIRVANA (Nanopore sequencing of Isothermal Rapid Viral Amplification for Near real-time Analysis) and useful in the SARS-CoV-2 related Nanopore sequencing.
+RTNano is a tool for real-time analysis of Nanopore sequencing data to detect pathogen-positive samples and call variants. The analysis is ultra-fast, without consuming too much PC resourse. It is used in NIRVANA (Nanopore sequencing of Isothermal Rapid Viral Amplification for Near real-time Analysis) and useful in the SARS-CoV-2 related Nanopore sequencing.
 
 More detail: [coming...]
 
@@ -38,9 +38,11 @@ python ./rt_nano.py -h
 A list of full usage:
 ```
 usage: rt_nano.py [-h] -p PATH [-s SAVE_PATH] [-r REFER_SEQ] [-t THREAD]
-                  [-T INTERVAL_TIME] [-R TARGET_REGION] [-g GUPPY_BARCODER]
-                  [--run_time RUN_TIME] [--resume] [--put_back]
-                  [--call_variant] [--alle_freq ALLE_FREQ] [-v]
+                  [-T INTERVAL_TIME] [-g GUPPY_BARCODER] [-k BARCODE_KITS]
+                  [--run_time RUN_TIME] [--align_identity ALIGN_IDENTITY]
+                  [--covered_pcent COVERED_PCENT]
+                  [--housekeep_gene HOUSEKEEP_GENE] [--ntc NTC] [--resume]
+                  [--put_back] [--call_variant] [--alle_freq ALLE_FREQ] [-v]
 
 Real-Time analysis of Nanopore data for Covid-19 sequencing.
 
@@ -56,15 +58,28 @@ optional arguments:
   -t THREAD, --thread THREAD
                         working thread [1]
   -T INTERVAL_TIME, --interval_time INTERVAL_TIME
-                        interval time for analysis in minutes [1]
-  -R TARGET_REGION, --target_region TARGET_REGION
-                        primer targeted region (comma separated). Default:
-                        11050-11244,14307-14500,23123-23431,28086-28752
+                        interval time for scanning minknow folder in minutes
+                        [1]
   -g GUPPY_BARCODER, --guppy_barcoder GUPPY_BARCODER
                         Optional: path/to/guppy_barcoder, when offering this
                         parameter, it will do additional demultiplexing using
-                        guppy_barcoder --require_barcodes_both_ends --trim_barcodes
+                        guppy_barcoder --require_barcodes_both_ends
+                        --trim_barcodes
+  -k BARCODE_KITS, --barcode_kits BARCODE_KITS
+                        barcode kits used, e.g. "EXP-NBD114 EXP-NBD104" it is
+                        required when providing -g/--guppy_barcoder
   --run_time RUN_TIME   total run time in hours [48]
+  --align_identity ALIGN_IDENTITY
+                        minimum [0.89] alignment identity when considering an
+                        effective alignment
+  --covered_pcent COVERED_PCENT
+                        minimum covering [0.96] of amplicon length when
+                        considering an effective alignment
+  --housekeep_gene HOUSEKEEP_GENE
+                        the amplicon name of housekeeping gene in the
+                        sequencing, default: [ACTB_263bp]
+  --ntc NTC             barcode number of no template control in the
+                        sequencing, e.g. barcode96
   --resume              resume the unexpectedly interrupted analysis. Please
                         use the same [-p] [-s] as before
   --put_back            return fastq file to their original fastq_pass folder.
@@ -125,5 +140,5 @@ python ./rt_nano.py -p ./example/ --call_variant
 It is strongly recommended to download guppy from Nanopore community, and provide guppy_barcoder for RTNano to ensure a confident demultiplexing.
 Run the command like below:
 ```
-python ./rt_nano.py -p ./example/ -g ~/Downloads/ont-guppy-cpu/bin/guppy_barcoder
+python ./rt_nano.py -p ./example/ -g ~/Downloads/ont-guppy-cpu/bin/guppy_barcoder -k "EXP-NBD114"
 ```
