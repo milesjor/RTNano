@@ -26,7 +26,7 @@ def get_argparse():
     parser.add_argument('-s', '--save_path', type=str,
                         help='path/to/saved_folder Default: rtnano_result in -p PATH folder')
     parser.add_argument('-r', '--refer_seq', type=validate_file,
-                        help='path/to/reference_genome.fa, default is using SARS-CoV-2.fa in program folder')
+                        help='path/to/reference_genome.fa, default is using amplicon.fa in program folder')
     parser.add_argument('-t', '--thread', type=int, default='1', help='working thread [1]')
     parser.add_argument('-T', '--interval_time', type=int, default='1',
                         help='interval time for scanning minknow folder in minutes [1]')

@@ -53,8 +53,8 @@ optional arguments:
                         path/to/saved_folder Default: rtnano_result in -p PATH
                         folder
   -r REFER_SEQ, --refer_seq REFER_SEQ
-                        path/to/reference_genome.fa, default is using SARS-
-                        CoV-2.fa in program folder
+                        path/to/reference_genome.fa, default is using amplicon.fa
+                        in program folder
   -t THREAD, --thread THREAD
                         working thread [1]
   -T INTERVAL_TIME, --interval_time INTERVAL_TIME
