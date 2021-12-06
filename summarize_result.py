@@ -80,17 +80,16 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
         cov2_1_5 = 0
 
         for key in record_dir:
-            if key.startswith('cov2'):
-                if int(record_dir[key] - ntc_record_dir[key]) >= 50:
-                    cov2_50_plus += 1
-                elif 20 <= int(record_dir[key] - ntc_record_dir[key]) < 50:
-                    cov2_20_50 += 1
-                elif 10 <= int(record_dir[key] - ntc_record_dir[key]) < 20:
-                    cov2_10_20 += 1
-                elif 5 <= int(record_dir[key] - ntc_record_dir[key]) < 10:
-                    cov2_5_10 += 1
-                elif 1 <= int(record_dir[key] - ntc_record_dir[key]) < 5:
-                    cov2_1_5 += 1
+            if int(record_dir[key] - ntc_record_dir[key]) >= 50:
+                cov2_50_plus += 1
+            elif 20 <= int(record_dir[key] - ntc_record_dir[key]) < 50:
+                cov2_20_50 += 1
+            elif 10 <= int(record_dir[key] - ntc_record_dir[key]) < 20:
+                cov2_10_20 += 1
+            elif 5 <= int(record_dir[key] - ntc_record_dir[key]) < 10:
+                cov2_5_10 += 1
+            elif 1 <= int(record_dir[key] - ntc_record_dir[key]) < 5:
+                cov2_1_5 += 1
 
         if cov2_50_plus >= 3:
             result_mark = 'POS_3'

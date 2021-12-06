@@ -43,6 +43,9 @@ def get_argparse():
                         help='minimum covering [0.96] of amplicon length when considering an effective alignment')
     parser.add_argument('--housekeep_gene', type=str, default='ACTB_263bp',
                         help='the amplicon name of housekeeping gene in the sequencing, default: [ACTB_263bp]')
+    parser.add_argument('--rule_file', type=validate_file,
+                        help='the rule_file of strain variants, default is '
+                             'using RTNano/required_files/variant_rules.txt in program folder')
     parser.add_argument('--ntc', type=str,
                         help='barcode number of no template control in the sequencing, e.g. barcode96')
     parser.add_argument('--resume', action='store_true',
@@ -50,6 +53,8 @@ def get_argparse():
     parser.add_argument('--put_back', action='store_true',
                         help='return fastq file to their original fastq_pass folder. Please use the same [-p] [-s] [-g]'
                              ' as you generated the result, together with --put_back')
+    parser.add_argument('--rt_variant', action='store_true',
+                        help='real-time call variants using samtools and filter by alleic frequency (>=0.5). ')
     parser.add_argument('--call_variant', action='store_true',
                         help='call variants using samtools and filter by alleic frequency (>=0.5). '
                              'Please use the same [-p] [-s] '
@@ -61,6 +66,8 @@ def get_argparse():
     args = parser.parse_args()
     if args.refer_seq is None:
         args.refer_seq = sys.path[0] + '/amplicon.fa'
+    if args.rule_file is None:
+        args.rule_file = sys.path[0] + '/required_files/variant_rules.txt'
     if args.guppy_barcoder is not None:
         if args.barcode_kits is None:
             sys.stderr.write("ERROR!  Please provide -k/--barcode_kits\n")
@@ -323,7 +330,10 @@ def cycle_run(args, result_folder, cycle_time, target_amplicon):
             start = timer()
 
             individual_analysis(args, result_folder, target_amplicon)
-
+            # ---------------------------------
+            if args.rt_variant is True:
+                variant_call(args)
+            # ---------------------------------
             end = timer()
             used_time = round(end - start)
             used_time_min = round(used_time / 60)
@@ -412,6 +422,40 @@ def put_back(args):
         sys.exit(1)
 
 
+def variant_call(args):
+    if args.save_path is None:
+        args.save_path = args.path + '/rtnano_result'
+
+    fastq_regex = args.save_path + '/analyzed_achieve/accumulated_reads/*.fastq'
+
+    fastq_file_all = glob.glob(str(fastq_regex))
+    if len(fastq_file_all) >= 1:
+        logging.info("\n--> Variant calling detect %s fastq file" % len(fastq_file_all))
+        logging.info("--> Variant result saved in %s/snv/%s\n" % (args.save_path,
+                                                 str(datetime.now().strftime("%Y%m%d_%H.%M.%S"))))
+
+        save_path = args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/'
+        if not os.path.isdir(args.save_path + '/snv/'):
+            os.mkdir(args.save_path + '/snv/')
+
+        if not os.path.isdir(args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/'):
+            os.mkdir(args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/')
+
+        p = multiprocessing.Pool(args.thread)
+
+        for file in fastq_file_all:
+            p.apply_async(call_variant.call, args=(file, save_path, args.refer_seq, args.alle_freq, args.rule_file))
+
+        p.close()
+        p.join()
+
+        save_log_file = save_path + "/variant_summary.txt"
+        with open(save_log_file, "r") as save_file:
+            for line in sorted(save_file):
+                logging.info(line.strip())
+        logging.info("\n%s    Variant calling finished!" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
 def main():
     args = get_argparse()
     if check_tool("minimap2") is not True:
@@ -429,34 +473,26 @@ def main():
         if check_tool("bcftools") is not True:
             sys.exit("ERROR! Executable bcftools is not found!\n"
                      "ERROR! Please install bcftools -> `conda install bcftools=1.9`")
-        print("\n%s    Program start ..." % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        print("--> Read fastq file from %s/analyzed_achieve/accumulated_reads/*.fastq" % args.save_path)
 
         if args.save_path is None:
             args.save_path = args.path + '/rtnano_result'
 
+        result_folder = args.save_path
+        ctime = datetime.now().strftime("%Y%m%d_%H.%M.%S")
+        log_file = result_folder + '/' + ctime + '_rt_nano.log'
+        logging.basicConfig(level=logging.DEBUG,
+                            format='%(message)s',
+                            filename=log_file,
+                            filemode='w')
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+
         fastq_regex = args.save_path + '/analyzed_achieve/accumulated_reads/*.fastq'
-
         fastq_file_all = glob.glob(str(fastq_regex))
+
         if len(fastq_file_all) >= 1:
-            print("--> Detect %s fastq file" % len(fastq_file_all))
-            print("--> Result saved in %s/snv/%s" % (args.save_path,
-                                                     str(datetime.now().strftime("%Y%m%d_%H.%M.%S"))))
-
-            save_path = args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/'
-            if not os.path.isdir(args.save_path + '/snv/'):
-                os.mkdir(args.save_path + '/snv/')
-
-            if not os.path.isdir(args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/'):
-                os.mkdir(args.save_path + '/snv/' + str(datetime.now().strftime("%Y%m%d_%H.%M.%S")) + '/')
-
-            p = multiprocessing.Pool(args.thread)
-            for file in fastq_file_all:
-                p.apply_async(call_variant.call, args=(file, save_path, args.refer_seq, args.alle_freq))
-
-            p.close()
-            p.join()
-            print("%s    Variant calling finished!\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            logging.info("\n%s    Program start ..." % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            logging.info("--> Read fastq file from %s/analyzed_achieve/accumulated_reads/*.fastq" % args.save_path)
+            variant_call(args)
 
         else:
             sys.stderr.write("ERROR! No fastq file detected in %s/analyzed_achieve/accumulated_reads/\n" %
@@ -464,6 +500,14 @@ def main():
             sys.exit(0)
 
     else:
+        if args.rt_variant is True:
+            if check_tool("samtools") is not True:
+                sys.exit("ERROR! Executable samtools is not found!\n"
+                         "ERROR! Please install samtools -> `conda install samtools=1.9`")
+            if check_tool("bcftools") is not True:
+                sys.exit("ERROR! Executable bcftools is not found!\n"
+                         "ERROR! Please install bcftools -> `conda install bcftools=1.9`")
+
         result_folder = prepare_env(args)
 
         with open(args.refer_seq) as infile:

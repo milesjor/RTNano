@@ -1,0 +1,4 @@
+variant_name	amplicon_name:100:A>T	# SNV
+variant_name	amplicon_name:100:delA	# 1bp deletion
+variant_name	amplicon_name:100_101:del	# >=2bp deletion
+variant_name	amplicon_name:100_101:insA	# insertion between position_100 and position_101
