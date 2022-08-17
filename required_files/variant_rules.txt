@@ -1,19 +1,122 @@
-delta variant	amplicon_1:32:C>G
-delta variant	amplicon_1:184:G>T
-delta variant	amplicon_1:260:C>T
-delta variant	amplicon_2:38:G>A
-delta variant	amplicon_2:79_81:del
-delta variant	amplicon_2:82_84:del
-delta variant	amplicon_2:85:A>G
-delta variant	amplicon_3:58:C>T
-delta variant	amplicon_3:166:G>T
-delta variant	amplicon_4:44:G>T
-delta variant	amplicon_4:148:T>G
-delta variant	amplicon_4:226:C>A
-delta variant	amplicon_4:243:G>C
-delta variant	amplicon_5:34:A>G
-delta variant	amplicon_5:235:C>G
-alpha variant	amplicon_1:179_184:del
-alpha variant	amplicon_2:42_44:del
-alpha variant	amplicon_4:294:A>T
-alpha variant	amplicon_5:235:C>A
+20H(Beta,V2)(B.1.351)	amplicon_3:37:A>G
+20H(Beta,V2)(B.1.351)	amplicon_5:34:A>G
+20H(Beta,V2)(B.1.351)	amplicon_1:215:A>C
+20H(Beta,V2)(B.1.351)	amplicon_4:243:G>A
+20H(Beta,V2)(B.1.351)	amplicon_4:44:G>T
+20H(Beta,V2)(B.1.351)	amplicon_1:28:C>T
+20H(Beta,V2)(B.1.351)	amplicon_4:294:A>T
+20H(Beta,V2)(B.1.351)	amplicon_3:130:G>T
+20H(Beta,V2)(B.1.351)	amplicon_3:117_119:del
+20H(Beta,V2)(B.1.351)	amplicon_3:120_122:del
+20H(Beta,V2)(B.1.351)	amplicon_3:123_125:del
+21B(Kappa)(B.1.617.1)	amplicon_5:34:A>G
+21B(Kappa)(B.1.617.1)	amplicon_4:294:A>T
+21B(Kappa)(B.1.617.1)	amplicon_5:235:C>A
+21B(Kappa)(B.1.617.1)	amplicon_2:42_44:del
+21B(Kappa)(B.1.617.1)	amplicon_1:182_184:del
+21B(Kappa)(B.1.617.1)	amplicon_1:179_181:del
+20J(Gamma,V3)(P.1)	amplicon_2:25:G>T
+20J(Gamma,V3)(P.1)	amplicon_5:34:A>G
+20J(Gamma,V3)(P.1)	amplicon_4:243:G>A
+20J(Gamma,V3)(P.1)	amplicon_5:156:C>T
+20J(Gamma,V3)(P.1)	amplicon_4:43:A>C
+20J(Gamma,V3)(P.1)	amplicon_1:28:C>T
+20J(Gamma,V3)(P.1)	amplicon_4:294:A>T
+20J(Gamma,V3)(P.1)	amplicon_1:52:C>T
+20J(Gamma,V3)(P.1)	amplicon_2:183:G>T
+20J(Gamma,V3)(P.1)	amplicon_1:35:C>A
+21A(Delta)(B.1.617.2)	amplicon_5:34:A>G
+21A(Delta)(B.1.617.2)	amplicon_2:79_81:del
+21A(Delta)(B.1.617.2)	amplicon_2:82_84:del
+21A(Delta)(B.1.617.2)	amplicon_4:148:T>G
+21A(Delta)(B.1.617.2)	amplicon_5:235:C>G
+21A(Delta)(B.1.617.2)	amplicon_2:85:A>G
+21A(Delta)(B.1.617.2)	amplicon_1:32:C>G
+21A(Delta)(B.1.617.2)	amplicon_4:226:C>A
+21A(Delta)(B.1.617.2)	amplicon_1:184:G>T
+21A(Delta)(B.1.617.2)	amplicon_1:260:C>T
+21A(Delta)(B.1.617.2)	amplicon_2:38:G>A
+21A(Delta)(B.1.617.2)	amplicon_3:58:C>T
+21A(Delta)(B.1.617.2)	amplicon_3:166:G>T
+21A(Delta)(B.1.617.2)	amplicon_4:44:G>T
+21A(Delta)(B.1.617.2)	amplicon_4:243:G>C
+21B(Kappa)(B.1.617.1)	amplicon_5:34:A>G
+21B(Kappa)(B.1.617.1)	amplicon_2:73:G>A
+21B(Kappa)(B.1.617.1)	amplicon_4:243:G>C
+21B(Kappa)(B.1.617.1)	amplicon_4:148:T>G
+21B(Kappa)(B.1.617.1)	amplicon_5:235:C>G
+21D(Eta)(B.1.525)	amplicon_1:176:C>T
+21D(Eta)(B.1.525)	amplicon_5:34:A>G
+21D(Eta)(B.1.525)	amplicon_4:243:G>A
+21D(Eta)(B.1.525)	amplicon_1:131:A>G
+21D(Eta)(B.1.525)	amplicon_5:224:G>C
+21D(Eta)(B.1.525)	amplicon_2:42_44:del
+21D(Eta)(B.1.525)	amplicon_1:182_184:del
+21D(Eta)(B.1.525)	amplicon_1:179_181:del
+21F(Iota)(B.1.526)	amplicon_3:151:A>G
+21F(Iota)(B.1.526)	amplicon_5:34:A>G
+21F(Iota)(B.1.526)	amplicon_4:243:G>A
+21F(Iota)(B.1.526)	amplicon_1:260:C>T
+21G(Lambda)(C.37)	amplicon_3:150:G>A
+21G(Lambda)(C.37)	amplicon_5:34:A>G
+21G(Lambda)(C.37)	amplicon_4:262:T>C
+21G(Lambda)(C.37)	amplicon_1:200:G>T
+21G(Lambda)(C.37)	amplicon_4:148:T>A
+21G(Lambda)(C.37)	amplicon_1:203:C>T
+21G(Lambda)(C.37)	amplicon_3:144_146:del
+21G(Lambda)(C.37)	amplicon_3:129_131:del
+21G(Lambda)(C.37)	amplicon_3:132_134:del
+21G(Lambda)(C.37)	amplicon_3:141_143:del
+21G(Lambda)(C.37)	amplicon_3:138_140:del
+21G(Lambda)(C.37)	amplicon_3:147_149:del
+21H(Mu)(B.1.621)	amplicon_5:34:A>G
+21H(Mu)(B.1.621)	amplicon_4:243:G>A
+21H(Mu)(B.1.621)	amplicon_4:294:A>T
+21H(Mu)(B.1.621)	amplicon_5:235:C>A
+21H(Mu)(B.1.621)	amplicon_1:260:C>T
+21H(Mu)(B.1.621)	amplicon_2:43:T>A
+21H(Mu)(B.1.621)	amplicon_2:47:A>C
+21K(Omicron)(BA.1)	amplicon_1:176:C>T
+21K(Omicron)(BA.1)	amplicon_5:34:A>G
+21K(Omicron)(BA.1)	amplicon_4:244:A>C
+21K(Omicron)(BA.1)	amplicon_2:37_39:del
+21K(Omicron)(BA.1)	amplicon_4:129:G>A
+21K(Omicron)(BA.1)	amplicon_4:279:G>A
+21K(Omicron)(BA.1)	amplicon_5:156:C>T
+21K(Omicron)(BA.1)	amplicon_4:44:G>T
+21K(Omicron)(BA.1)	amplicon_3:25_27:del
+21K(Omicron)(BA.1)	amplicon_4:113:T>G
+21K(Omicron)(BA.1)	amplicon_4:294:A>T
+21K(Omicron)(BA.1)	amplicon_5:230:T>G
+21K(Omicron)(BA.1)	amplicon_5:235:C>A
+21K(Omicron)(BA.1)	amplicon_4:286:A>G
+21K(Omicron)(BA.1)	amplicon_4:223:G>A
+21K(Omicron)(BA.1)	amplicon_4:226:C>A
+21K(Omicron)(BA.1)	amplicon_1:260:C>T
+21K(Omicron)(BA.1)	amplicon_2:40_42:del
+21K(Omicron)(BA.1)	amplicon_2:42_44:del
+21K(Omicron)(BA.1)	amplicon_2:46:T>G
+21K(Omicron)(BA.1)	amplicon_4:306:T>C
+21K(Omicron)(BA.1)	amplicon_1:182_184:del
+21K(Omicron)(BA.1)	amplicon_1:179_181:del
+21L(Omicron)(BA.2)	amplicon_1:47_55:del
+21L(Omicron)(BA.2)	amplicon_4:6:A>G
+21L(Omicron)(BA.2)	amplicon_5:34:A>G
+21L(Omicron)(BA.2)	amplicon_4:244:A>C
+21L(Omicron)(BA.2)	amplicon_2:38:G>A
+21L(Omicron)(BA.2)	amplicon_5:156:C>T
+21L(Omicron)(BA.2)	amplicon_4:44:G>T
+21L(Omicron)(BA.2)	amplicon_1:47_49:del
+21L(Omicron)(BA.2)	amplicon_4:113:T>G
+21L(Omicron)(BA.2)	amplicon_4:294:A>T
+21L(Omicron)(BA.2)	amplicon_5:230:T>G
+21L(Omicron)(BA.2)	amplicon_1:50_52:del
+21L(Omicron)(BA.2)	amplicon_1:53_55:del
+21L(Omicron)(BA.2)	amplicon_5:235:C>A
+21L(Omicron)(BA.2)	amplicon_4:286:A>G
+21L(Omicron)(BA.2)	amplicon_4:17:A>T
+21L(Omicron)(BA.2)	amplicon_4:223:G>A
+21L(Omicron)(BA.2)	amplicon_1:32:C>T
+21L(Omicron)(BA.2)	amplicon_4:226:C>A
+21L(Omicron)(BA.2)	amplicon_3:31:T>G
+21L(Omicron)(BA.2)	amplicon_4:306:T>C

@@ -164,8 +164,8 @@ def get_fastq_file(args, result_folder):
             return ['no_subfolder_in_fastq_pass', 0]
 
         else:
-            cmd = """find {gz_fastq} -name "*.fastq.gz" -print0 | xargs -0 gunzip""".format(gz_fastq=fastq_path)
-            subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE)
+            # cmd = """find {gz_fastq} -name "*.fastq.gz" -print0 | xargs -0 gunzip""".format(gz_fastq=fastq_path)
+            # subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE)
 
             fastq_file_all = glob.glob(str(fastq_path + '/*/*.fastq'))
             # print(fastq_file_all)

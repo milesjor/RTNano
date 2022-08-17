@@ -4,13 +4,13 @@ import logging
 
 def rule():
     rules = {
-        'POS+++': '3 region_alignment_record >= 50',
-        'POS++': '2 region_alignment_record >= 50',
-        'POS+': '1 region_alignment_record >= 50'
+        'POS_3': '3 region_alignment_record >= 50',
+        'POS_2': '2 region_alignment_record >= 50',
+        'POS_1': '1 region_alignment_record >= 50'
                 'OR 2 region_alignment_record >= 20'
                 'OR 3 region_alignment_record >= 10'
                 'OR 4 region_alignment_record >= 5',
-        'POS-': 'ACTB house_keeping_record >= 1000'
+        'POS_0': 'ACTB house_keeping_record >= 1000'
                 'AND any region_alignment_record >= 1',
         'NEG': 'ACTB house_keeping_record >= 1000'
                 'AND all region_alignment_record = 0',
@@ -21,11 +21,14 @@ def rule():
 
 
 def summarize(updated_result, target_amplicon, housekeeping, NTC):
-    # updated_result = '/Users/bic/Desktop/cov-19_data/test_code/clean_test2h.txt'
-    # target_amplicon = ['cov2_13_195bp', 'cov2_5_194bp', 'cov2_9_309bp', 'cov2_4_273bp', 'cov2_10_394bp',
-    #                    'ACTB_263bp', 'influ_A_244bp', 'HAV_161bp', 'HKU1_151bp']
+    # updated_result = '/Users/bic/OneDrive/seq_data/rtnano_Gerardo/20220324_11.16.15_result.txt'
+    # target_amplicon = ['amplicon_1', 'amplicon_2', 'amplicon_3', 'amplicon_4', 'amplicon_5', 'ACTB_263bp']
     # housekeeping = 'ACTB_263bp'
-    # NTC = 'barcode61'
+    # NTC = 'barcode99'
+
+    # print("target amplicon", target_amplicon)
+    target_amplicon_no_hp = [n for n in target_amplicon if n != housekeeping]
+    # print("target amplicon without housekeeping", target_amplicon_no_hp)
 
     outfile_header = '\t'.join(['\n\n#barcode', 'Result', 'read', 'base'] + target_amplicon) + '\n'
     # print(outfile_header)
@@ -42,6 +45,7 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
         bc_df = df[df['#barcode'].str.match(NTC)]
         if bc_df.empty is True:
             logging.info("WARNING!   can not find NTC barcode data, ignore NTC in below result.")
+            print("WARNING!   can not find NTC barcode data, ignore NTC in below result.")
             for amplicon in target_amplicon:
                 ntc_record_dir[amplicon] = 0
         else:
@@ -55,7 +59,7 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
             ntc_record_dir[amplicon] = 0
 
     barcode_list = df['#barcode'].unique()
-    # barcode_list = ['barcode15']
+    # barcode_list = ['barcode38']
     for bc in barcode_list:
         bc_df = df[df['#barcode'].str.match(bc)]
         # print(bc_df)
@@ -73,14 +77,19 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
             housekeeping = "no_hp"
             record_dir[housekeeping] = 0
 
+        # print("\nbarcode", bc)
+        # print(record_dir)
+        # print(this_result_end)
+
         cov2_50_plus = 0
         cov2_20_50 = 0
         cov2_10_20 = 0
         cov2_5_10 = 0
         cov2_1_5 = 0
 
-        for key in record_dir:
+        for key in target_amplicon_no_hp:
             if int(record_dir[key] - ntc_record_dir[key]) >= 50:
+                # print(key, record_dir[key])
                 cov2_50_plus += 1
             elif 20 <= int(record_dir[key] - ntc_record_dir[key]) < 50:
                 cov2_20_50 += 1
@@ -90,6 +99,12 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
                 cov2_5_10 += 1
             elif 1 <= int(record_dir[key] - ntc_record_dir[key]) < 5:
                 cov2_1_5 += 1
+
+        # print("cov2_50_plus", cov2_50_plus)
+        # print("cov2_20_50", cov2_20_50)
+        # print("cov2_10_20", cov2_10_20)
+        # print("cov2_5_10", cov2_5_10)
+        # print("cov2_1_5", cov2_1_5)
 
         if cov2_50_plus >= 3:
             result_mark = 'POS_3'
@@ -104,7 +119,11 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
         elif int(cov2_50_plus + cov2_20_50 + cov2_10_20 + cov2_5_10 + cov2_1_5) >= 3:
             result_mark = 'POS_1'
         elif int(cov2_50_plus + cov2_20_50 + cov2_10_20 + cov2_5_10 + cov2_1_5) >= 1:
-            result_mark = 'POS_0'
+            # result_mark = 'POS_0'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_0'
+            else:
+                result_mark = 'UNK'
         else:
             if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
                 result_mark = 'NEG'
