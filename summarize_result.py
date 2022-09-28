@@ -98,7 +98,8 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
             elif 5 <= int(record_dir[key] - ntc_record_dir[key]) < 10:
                 cov2_5_10 += 1
             elif 1 <= int(record_dir[key] - ntc_record_dir[key]) < 5:
-                cov2_1_5 += 1
+                # cov2_1_5 += 1
+                cov2_1_5 += 0
 
         # print("cov2_50_plus", cov2_50_plus)
         # print("cov2_20_50", cov2_20_50)
@@ -107,17 +108,41 @@ def summarize(updated_result, target_amplicon, housekeeping, NTC):
         # print("cov2_1_5", cov2_1_5)
 
         if cov2_50_plus >= 3:
-            result_mark = 'POS_3'
+            # result_mark = 'POS_3'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_3'
+            else:
+                result_mark = 'UNK'
         elif cov2_50_plus == 2:
-            result_mark = 'POS_2'
+            # result_mark = 'POS_2'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_2'
+            else:
+                result_mark = 'UNK'
         elif cov2_50_plus == 1 and int(cov2_20_50 + cov2_10_20 + cov2_5_10) >= 2:
-            result_mark = 'POS_2'
+            # result_mark = 'POS_2'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_2'
+            else:
+                result_mark = 'UNK'
         elif int(cov2_50_plus + cov2_20_50) >= 1:
-            result_mark = 'POS_1'
+            # result_mark = 'POS_1'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_1'
+            else:
+                result_mark = 'UNK'
         elif int(cov2_50_plus + cov2_20_50 + cov2_10_20 + cov2_5_10) >= 2:
-            result_mark = 'POS_1'
+            # result_mark = 'POS_1'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_1'
+            else:
+                result_mark = 'UNK'
         elif int(cov2_50_plus + cov2_20_50 + cov2_10_20 + cov2_5_10 + cov2_1_5) >= 3:
-            result_mark = 'POS_1'
+            # result_mark = 'POS_1'
+            if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:
+                result_mark = 'POS_1'
+            else:
+                result_mark = 'UNK'
         elif int(cov2_50_plus + cov2_20_50 + cov2_10_20 + cov2_5_10 + cov2_1_5) >= 1:
             # result_mark = 'POS_0'
             if int(record_dir[housekeeping] - ntc_record_dir[housekeeping]) >= 1000:

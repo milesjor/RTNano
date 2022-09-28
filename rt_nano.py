@@ -3,6 +3,7 @@
 # Email: chongwei.bi@kaust.edu.sa
 
 import os
+import re
 import sys
 import time
 import subprocess
@@ -453,7 +454,25 @@ def variant_call(args):
         p.join()
 
         save_log_file = save_path + "/variant_summary.txt"
-        with open(save_log_file, "r") as save_file:
+        clean_save_log_file = save_path + "/variant_summary.clean.txt"
+
+        with open(save_log_file, 'r') as infile, open(clean_save_log_file, "w") as outfile:
+            for line in infile:
+                line_split = line.strip().split("\t")
+                clean_line_split = list()
+                clean_line_split.append(line_split[0])
+                # print(line_split)
+                for element in line_split:
+                    if str("](") in element:
+                        # print(element)
+                        element_split = re.split(r']\(|/', element)
+                        # print(element_split)
+                        if int(element_split[1]) is not 0:
+                            # print("yes", element_split[1])
+                            clean_line_split.append(element)
+                outfile.writelines("\t".join(clean_line_split) + '\n')
+
+        with open(clean_save_log_file, "r") as save_file:
             for line in sorted(save_file):
                 logging.info(line.strip())
         logging.info("\n%s    Variant calling finished!" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
